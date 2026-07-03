@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ficha de Visitas — Caça ao Apê</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  :root{
+    --paper:#F4F5F0;
+    --grid-line:#D8DED3;
+    --ink:#16324F;
+    --ink-soft:#3E5670;
+    --amber:#E8A33D;
+    --amber-dark:#C97F1B;
+    --sage:#4C7A5D;
+    --sage-bg:#E4EEE7;
+    --terracotta:#C4472F;
+    --terracotta-bg:#F5E1DC;
+    --slate-bg:#E3E8ED;
+    --card-bg:#FFFFFF;
+    --line:#C9CFC5;
+    --shadow:0 2px 8px rgba(22,50,79,0.08), 0 1px 2px rgba(22,50,79,0.06);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
+      var(--paper);
+    background-size:28px 28px;
+    font-family:'IBM Plex Sans', sans-serif;
+    color:var(--ink);
+    padding:32px 20px 80px;
+  }
+  .wrap{max-width:1080px;margin:0 auto;}
+
+  header.top{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    flex-wrap:wrap;
+    gap:16px;
+    border-bottom:2px solid var(--ink);
+    padding-bottom:18px;
+    margin-bottom:28px;
+  }
+  header.top h1{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:clamp(1.7rem, 3vw, 2.4rem);
+    margin:0;
+    letter-spacing:-0.02em;
+  }
+  header.top h1 span{color:var(--amber-dark);}
+  header.top p{
+    margin:6px 0 0;
+    color:var(--ink-soft);
+    font-size:0.92rem;
+    max-width:46ch;
+  }
+  .stamp-legend{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.72rem;
+  }
+  .stamp-legend .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:middle;}
+
+  /* Toolbar */
+  .toolbar{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    align-items:center;
+    margin-bottom:22px;
+  }
+  .toolbar input[type="text"], .toolbar select{
+    font-family:'IBM Plex Sans', sans-serif;
+    padding:9px 12px;
+    border:1.5px solid var(--ink);
+    border-radius:3px;
+    background:var(--card-bg);
+    font-size:0.88rem;
+    color:var(--ink);
+  }
+  .toolbar input[type="text"]{flex:1;min-width:180px;}
+  .btn{
+    font-family:'IBM Plex Sans', sans-serif;
+    font-weight:600;
+    font-size:0.85rem;
+    padding:9px 16px;
+    border-radius:3px;
+    border:1.5px solid var(--ink);
+    background:var(--ink);
+    color:var(--paper);
+    cursor:pointer;
+    transition:transform .12s ease, box-shadow .12s ease;
+  }
+  .btn:hover{transform:translateY(-1px); box-shadow:var(--shadow);}
+  .btn.secondary{background:var(--card-bg); color:var(--ink);}
+  .btn.amber{background:var(--amber); border-color:var(--amber-dark); color:var(--ink);}
+  .btn.small{padding:5px 10px;font-size:0.75rem;}
+  .file-btn{position:relative;overflow:hidden;}
+  .file-btn input[type="file"]{
+    position:absolute; inset:0; opacity:0; cursor:pointer;
+  }
+  .sync-status{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.75rem;
+    display:flex;
+    align-items:center;
+    gap:6px;
+    padding:8px 4px;
+  }
+  .sync-status .dot{width:8px;height:8px;border-radius:50%;background:var(--line);flex-shrink:0;}
+  .sync-status.ok .dot{background:var(--sage);}
+  .sync-status.salvando .dot{background:var(--amber-dark);}
+  .sync-status.erro .dot{background:var(--terracotta);}
+  .sync-status.conectando .dot{background:var(--ink-soft);}
+
+  /* Form panel */
+  .panel{
+    background:var(--card-bg);
+    border:1.5px solid var(--ink);
+    border-radius:6px;
+    box-shadow:var(--shadow);
+    padding:22px;
+    margin-bottom:32px;
+    display:none;
+  }
+  .panel.open{display:block;}
+  .panel h2{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:1.15rem;
+    margin:0 0 16px;
+  }
+  .grid-form{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(200px,1fr));
+    gap:14px;
+  }
+  .field{display:flex; flex-direction:column; gap:5px;}
+  .field.full{grid-column:1/-1;}
+  .field label{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.7rem;
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+    color:var(--ink-soft);
+  }
+  .field input, .field select, .field textarea{
+    font-family:'IBM Plex Sans', sans-serif;
+    padding:8px 10px;
+    border:1.5px solid var(--line);
+    border-radius:3px;
+    font-size:0.9rem;
+    color:var(--ink);
+    background:#fff;
+  }
+  .field textarea{resize:vertical;min-height:70px;font-family:inherit;}
+  .field input:focus, .field select:focus, .field textarea:focus{
+    outline:2px solid var(--amber);
+    outline-offset:1px;
+    border-color:var(--amber-dark);
+  }
+  .stars{display:flex;gap:4px;font-size:1.4rem;}
+  .stars button{
+    background:none;border:none;cursor:pointer;color:var(--line);padding:0;line-height:1;
+  }
+  .stars button.on{color:var(--amber-dark);}
+  .photo-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;}
+  .photo-thumb{position:relative;width:64px;height:64px;border-radius:4px;overflow:hidden;border:1.5px solid var(--line);}
+  .photo-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+  .photo-thumb button{
+    position:absolute;top:2px;right:2px;background:rgba(22,50,79,0.85);color:#fff;
+    border:none;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer;line-height:1;
+  }
+  .panel-actions{display:flex;gap:10px;margin-top:18px;justify-content:flex-end;}
+
+  /* Cards */
+  .count-line{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.78rem;
+    color:var(--ink-soft);
+    margin:0 0 14px;
+  }
+  .cards{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(280px,1fr));
+    gap:20px;
+  }
+  .card{
+    background:var(--card-bg);
+    border:1.5px solid var(--ink);
+    border-radius:6px;
+    box-shadow:var(--shadow);
+    padding:18px 18px 16px;
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .card::before{
+    content:"";
+    position:absolute;
+    top:-1px; left:14px; right:14px;
+    height:0;
+    border-top:2px dashed var(--line);
+  }
+  .card-head{display:flex; justify-content:space-between; align-items:flex-start; gap:10px;}
+  .card-title{font-family:'Space Grotesk', sans-serif; font-size:1.05rem; margin:0; line-height:1.25;}
+  .card-title a{color:var(--ink); text-decoration:none; border-bottom:1.5px solid var(--amber-dark);}
+  .stamp{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.66rem;
+    font-weight:600;
+    text-transform:uppercase;
+    letter-spacing:0.05em;
+    padding:4px 9px;
+    border-radius:2px;
+    border:1.5px solid currentColor;
+    transform:rotate(-6deg);
+    white-space:nowrap;
+    flex-shrink:0;
+  }
+  .stamp.agendada{color:var(--ink-soft); background:var(--slate-bg);}
+  .stamp.visitada{color:var(--amber-dark); background:#FBF0DD;}
+  .stamp.favorita{color:var(--sage); background:var(--sage-bg);}
+  .stamp.descartada{color:var(--terracotta); background:var(--terracotta-bg);}
+
+  .meta-line{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.82rem;
+    color:var(--ink-soft);
+    display:flex;
+    flex-wrap:wrap;
+    gap:4px 14px;
+  }
+  .meta-line b{color:var(--ink); font-weight:600;}
+  .specs{
+    display:flex;
+    gap:10px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.78rem;
+  }
+  .spec-chip{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:3px;
+    padding:4px 8px;
+  }
+  .obs{font-size:0.85rem; color:var(--ink-soft); line-height:1.4;}
+  .card .stars-view{font-size:0.95rem; color:var(--amber-dark); letter-spacing:2px;}
+  .card-photos{display:flex; gap:6px; flex-wrap:wrap;}
+  .card-photos img{width:52px;height:52px;object-fit:cover;border-radius:4px;border:1px solid var(--line);}
+  .card-actions{display:flex; gap:8px; margin-top:auto; padding-top:8px; border-top:1px dashed var(--line);}
+
+  .empty{
+    text-align:center;
+    padding:60px 20px;
+    border:1.5px dashed var(--line);
+    border-radius:6px;
+    color:var(--ink-soft);
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.85rem;
+  }
+  .footnote{
+    margin-top:36px;
+    font-size:0.78rem;
+    color:var(--ink-soft);
+    text-align:center;
+  }
+  @media (max-width:520px){
+    .toolbar{flex-direction:column; align-items:stretch;}
+    header.top{flex-direction:column; align-items:flex-start;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <h1>Ficha de Visitas <span>— Caça ao Apê</span></h1>
+      <p>Cada imóvel visto vira uma ficha: link, imobiliária, corretor, cômodos, vagas e suas observações — do jeito que você preencheria uma planilha, mas em cartões.</p>
+    </div>
+    <div class="stamp-legend">
+      <span><span class="dot" style="background:var(--ink-soft)"></span>Agendada</span>
+      <span><span class="dot" style="background:var(--amber-dark)"></span>Visitada</span>
+      <span><span class="dot" style="background:var(--sage)"></span>Favorita</span>
+      <span><span class="dot" style="background:var(--terracotta)"></span>Descartada</span>
+    </div>
+  </header>
+
+  <div class="toolbar">
+    <button class="btn amber" id="btnNovo">+ Nova visita</button>
+    <input type="text" id="busca" placeholder="Buscar por nome, imobiliária ou corretor...">
+    <select id="filtroStatus">
+      <option value="">Todos os status</option>
+      <option value="agendada">Agendada</option>
+      <option value="visitada">Visitada</option>
+      <option value="favorita">Favorita</option>
+      <option value="descartada">Descartada</option>
+    </select>
+    <select id="ordenar">
+      <option value="recentes">Mais recentes</option>
+      <option value="avaliacao">Melhor avaliação</option>
+      <option value="nome">Nome A–Z</option>
+    </select>
+    <button class="btn secondary" id="btnExport">Exportar dados (.json)</button>
+    <button class="btn secondary file-btn">Importar dados
+      <input type="file" id="importFile" accept="application/json">
+    </button>
+    <button class="btn amber" id="btnConectar">Conectar Google Drive</button>
+  </div>
+  <div class="sync-status" id="syncStatus"><span class="dot"></span><span id="syncText">Não conectado — os dados ficam só nesta aba até você conectar o Drive ou exportar</span></div>
+
+  <!-- Form Panel -->
+  <div class="panel" id="panel">
+    <h2 id="panelTitle">Nova visita</h2>
+    <input type="hidden" id="editId">
+    <div class="grid-form">
+      <div class="field full">
+        <label for="fNome">Nome / apelido do imóvel</label>
+        <input type="text" id="fNome" placeholder="Ex: Apê Vila Mariana, Ed. Girassol">
+      </div>
+      <div class="field full">
+        <label for="fLink">Link do anúncio</label>
+        <input type="url" id="fLink" placeholder="https://...">
+      </div>
+      <div class="field">
+        <label for="fImobiliaria">Imobiliária</label>
+        <input type="text" id="fImobiliaria" placeholder="Ex: Lopes, Quinto Andar...">
+      </div>
+      <div class="field">
+        <label for="fCorretor">Nome do corretor</label>
+        <input type="text" id="fCorretor" placeholder="Nome">
+      </div>
+      <div class="field">
+        <label for="fTelefone">Telefone do corretor</label>
+        <input type="tel" id="fTelefone" placeholder="(00) 00000-0000">
+      </div>
+      <div class="field">
+        <label for="fData">Data / hora da visita</label>
+        <input type="datetime-local" id="fData">
+      </div>
+      <div class="field">
+        <label for="fComodos">Número de cômodos</label>
+        <input type="number" id="fComodos" min="0" placeholder="Ex: 4">
+      </div>
+      <div class="field">
+        <label for="fGaragens">Vagas de garagem</label>
+        <input type="number" id="fGaragens" min="0" placeholder="Ex: 1">
+      </div>
+      <div class="field">
+        <label for="fAluguel">Valor do aluguel (opcional)</label>
+        <input type="text" id="fAluguel" placeholder="Ex: R$ 2.500 + cond.">
+      </div>
+      <div class="field">
+        <label for="fStatus">Status</label>
+        <select id="fStatus">
+          <option value="agendada">Agendada</option>
+          <option value="visitada">Visitada</option>
+          <option value="favorita">Favorita</option>
+          <option value="descartada">Descartada</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Avaliação</label>
+        <div class="stars" id="fStars">
+          <button type="button" data-v="1">★</button>
+          <button type="button" data-v="2">★</button>
+          <button type="button" data-v="3">★</button>
+          <button type="button" data-v="4">★</button>
+          <button type="button" data-v="5">★</button>
+        </div>
+      </div>
+      <div class="field full">
+        <label for="fObs">Observações</label>
+        <textarea id="fObs" placeholder="Iluminação, barulho, estado de conservação, condições da negociação..."></textarea>
+      </div>
+      <div class="field full">
+        <label for="fFotos">Fotos (opcional)</label>
+        <input type="file" id="fFotos" accept="image/*" multiple>
+        <div class="photo-row" id="photoPreview"></div>
+      </div>
+    </div>
+    <div class="panel-actions">
+      <button class="btn secondary" id="btnCancelar">Cancelar</button>
+      <button class="btn amber" id="btnSalvar">Salvar ficha</button>
+    </div>
+  </div>
+
+  <p class="count-line" id="countLine"></p>
+  <div class="cards" id="cards"></div>
+  <div class="empty" id="emptyState" style="display:none;">
+    Nenhuma visita cadastrada ainda.<br>Clique em "+ Nova visita" para começar sua ficha.
+  </div>
+
+  <p class="footnote">
+    Os dados ficam apenas na memória desta página — use "Exportar dados" para salvar um backup em .json<br>
+    e "Importar dados" para recarregá-lo depois (inclusive ao reabrir a página no Google Sites).
+  </p>
+</div>
+
+<script>
+// ===== CONFIGURAÇÃO DO GOOGLE DRIVE =====
+// Cole aqui o Client ID que você criar no Google Cloud Console (passo a passo que te enviei).
+const CLIENT_ID = 'COLE_AQUI_SEU_CLIENT_ID.apps.googleusercontent.com';
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+const DRIVE_FILE_NAME = 'visitas-apartamentos-dados.json';
+let accessToken = null;
+let driveFileId = null;
+let tokenClient = null;
+let userEmail = '';
+// ==========================================
+
+let visitas = [];
+let currentStars = 0;
+let currentPhotos = [];
+
+const panel = document.getElementById('panel');
+const cardsEl = document.getElementById('cards');
+const emptyState = document.getElementById('emptyState');
+const countLine = document.getElementById('countLine');
+
+function uid(){ return 'v' + Date.now() + Math.random().toString(36).slice(2,7); }
+
+function openPanel(edit){
+  panel.classList.add('open');
+  document.getElementById('panelTitle').textContent = edit ? 'Editar visita' : 'Nova visita';
+  panel.scrollIntoView({behavior:'smooth', block:'start'});
+}
+function closePanel(){
+  panel.classList.remove('open');
+  clearForm();
+}
+function clearForm(){
+  ['fNome','fLink','fImobiliaria','fCorretor','fTelefone','fData','fComodos','fGaragens','fAluguel','fObs','editId'].forEach(id=>{
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('fStatus').value = 'agendada';
+  currentStars = 0;
+  currentPhotos = [];
+  renderStars();
+  renderPhotoPreview();
+  document.getElementById('fFotos').value = '';
+}
+
+document.getElementById('btnNovo').addEventListener('click', ()=>{
+  clearForm();
+  openPanel(false);
+});
+document.getElementById('btnCancelar').addEventListener('click', closePanel);
+
+// Stars
+function renderStars(){
+  document.querySelectorAll('#fStars button').forEach(btn=>{
+    btn.classList.toggle('on', Number(btn.dataset.v) <= currentStars);
+  });
+}
+document.querySelectorAll('#fStars button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const v = Number(btn.dataset.v);
+    currentStars = (currentStars === v) ? 0 : v;
+    renderStars();
+  });
+});
+
+// Photos
+document.getElementById('fFotos').addEventListener('change', (e)=>{
+  const files = Array.from(e.target.files);
+  files.forEach(file=>{
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      currentPhotos.push(reader.result);
+      renderPhotoPreview();
+    };
+    reader.readAsDataURL(file);
+  });
+});
+function renderPhotoPreview(){
+  const box = document.getElementById('photoPreview');
+  box.innerHTML = '';
+  currentPhotos.forEach((src, i)=>{
+    const div = document.createElement('div');
+    div.className = 'photo-thumb';
+    div.innerHTML = `<img src="${src}"><button type="button" data-i="${i}">×</button>`;
+    box.appendChild(div);
+  });
+  box.querySelectorAll('button').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      currentPhotos.splice(Number(b.dataset.i),1);
+      renderPhotoPreview();
+    });
+  });
+}
+
+// Save
+document.getElementById('btnSalvar').addEventListener('click', ()=>{
+  const nome = document.getElementById('fNome').value.trim();
+  if(!nome){
+    document.getElementById('fNome').focus();
+    return;
+  }
+  const editId = document.getElementById('editId').value;
+  const data = {
+    id: editId || uid(),
+    nome,
+    link: document.getElementById('fLink').value.trim(),
+    imobiliaria: document.getElementById('fImobiliaria').value.trim(),
+    corretor: document.getElementById('fCorretor').value.trim(),
+    telefone: document.getElementById('fTelefone').value.trim(),
+    dataVisita: document.getElementById('fData').value,
+    comodos: document.getElementById('fComodos').value,
+    garagens: document.getElementById('fGaragens').value,
+    aluguel: document.getElementById('fAluguel').value.trim(),
+    status: document.getElementById('fStatus').value,
+    avaliacao: currentStars,
+    obs: document.getElementById('fObs').value.trim(),
+    fotos: currentPhotos.slice(),
+    criadoEm: editId ? (visitas.find(v=>v.id===editId)?.criadoEm || Date.now()) : Date.now()
+  };
+  if(editId){
+    visitas = visitas.map(v => v.id === editId ? data : v);
+  } else {
+    visitas.push(data);
+  }
+  closePanel();
+  render();
+  saveToDrive();
+});
+
+function editVisita(id){
+  const v = visitas.find(x=>x.id===id);
+  if(!v) return;
+  document.getElementById('editId').value = v.id;
+  document.getElementById('fNome').value = v.nome;
+  document.getElementById('fLink').value = v.link;
+  document.getElementById('fImobiliaria').value = v.imobiliaria;
+  document.getElementById('fCorretor').value = v.corretor;
+  document.getElementById('fTelefone').value = v.telefone;
+  document.getElementById('fData').value = v.dataVisita;
+  document.getElementById('fComodos').value = v.comodos;
+  document.getElementById('fGaragens').value = v.garagens;
+  document.getElementById('fAluguel').value = v.aluguel;
+  document.getElementById('fStatus').value = v.status;
+  currentStars = v.avaliacao || 0;
+  currentPhotos = (v.fotos || []).slice();
+  renderStars();
+  renderPhotoPreview();
+  openPanel(true);
+}
+function excluirVisita(id){
+  if(!confirm('Excluir esta ficha de visita?')) return;
+  visitas = visitas.filter(v=>v.id!==id);
+  render();
+  saveToDrive();
+}
+
+// Render list
+function statusLabel(s){
+  return {agendada:'Agendada', visitada:'Visitada', favorita:'Favorita', descartada:'Descartada'}[s] || s;
+}
+function render(){
+  const busca = document.getElementById('busca').value.toLowerCase();
+  const filtro = document.getElementById('filtroStatus').value;
+  const ordenar = document.getElementById('ordenar').value;
+
+  let lista = visitas.filter(v=>{
+    const matchBusca = !busca || [v.nome, v.imobiliaria, v.corretor].some(x => (x||'').toLowerCase().includes(busca));
+    const matchStatus = !filtro || v.status === filtro;
+    return matchBusca && matchStatus;
+  });
+
+  if(ordenar === 'avaliacao') lista.sort((a,b)=>(b.avaliacao||0)-(a.avaliacao||0));
+  else if(ordenar === 'nome') lista.sort((a,b)=>a.nome.localeCompare(b.nome));
+  else lista.sort((a,b)=>b.criadoEm-a.criadoEm);
+
+  cardsEl.innerHTML = '';
+  emptyState.style.display = lista.length ? 'none' : 'block';
+  countLine.textContent = visitas.length
+    ? `${lista.length} de ${visitas.length} ficha(s) exibida(s)`
+    : '';
+
+  lista.forEach(v=>{
+    const card = document.createElement('div');
+    card.className = 'card';
+    const stars = '★'.repeat(v.avaliacao||0) + '☆'.repeat(5-(v.avaliacao||0));
+    const dataFmt = v.dataVisita ? new Date(v.dataVisita).toLocaleString('pt-BR', {dateStyle:'short', timeStyle:'short'}) : '';
+    card.innerHTML = `
+      <div class="card-head">
+        <h3 class="card-title">${v.link ? `<a href="${v.link}" target="_blank" rel="noopener">${v.nome}</a>` : v.nome}</h3>
+        <span class="stamp ${v.status}">${statusLabel(v.status)}</span>
+      </div>
+      <div class="meta-line">
+        ${v.imobiliaria ? `<span><b>Imobiliária:</b> ${v.imobiliaria}</span>` : ''}
+        ${v.corretor ? `<span><b>Corretor:</b> ${v.corretor}</span>` : ''}
+        ${v.telefone ? `<span><b>Tel:</b> ${v.telefone}</span>` : ''}
+      </div>
+      <div class="specs">
+        ${v.comodos ? `<span class="spec-chip">${v.comodos} cômodo(s)</span>` : ''}
+        ${v.garagens ? `<span class="spec-chip">${v.garagens} vaga(s)</span>` : ''}
+        ${v.aluguel ? `<span class="spec-chip">${v.aluguel}</span>` : ''}
+        ${dataFmt ? `<span class="spec-chip">${dataFmt}</span>` : ''}
+      </div>
+      ${v.avaliacao ? `<div class="stars-view">${stars}</div>` : ''}
+      ${v.obs ? `<div class="obs">${v.obs}</div>` : ''}
+      ${v.fotos && v.fotos.length ? `<div class="card-photos">${v.fotos.map(f=>`<img src="${f}">`).join('')}</div>` : ''}
+      <div class="card-actions">
+        <button class="btn secondary small" onclick="editVisita('${v.id}')">Editar</button>
+        <button class="btn secondary small" onclick="excluirVisita('${v.id}')">Excluir</button>
+      </div>
+    `;
+    cardsEl.appendChild(card);
+  });
+}
+
+// ===== SINCRONIZAÇÃO COM O GOOGLE DRIVE =====
+function updateSyncStatus(kind, text){
+  const box = document.getElementById('syncStatus');
+  box.className = 'sync-status ' + kind;
+  document.getElementById('syncText').textContent = text;
+}
+
+document.getElementById('btnConectar').addEventListener('click', ()=>{
+  if(CLIENT_ID.startsWith('COLE_AQUI')){
+    alert('Antes de conectar: cole o seu Client ID do Google Cloud Console na constante CLIENT_ID, no início do código.');
+    return;
+  }
+  if(!window.google || !google.accounts || !google.accounts.oauth2){
+    alert('O Google ainda está carregando. Aguarde um instante e clique de novo.');
+    return;
+  }
+  if(!tokenClient){
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: CLIENT_ID,
+      scope: DRIVE_SCOPE,
+      callback: async (resp)=>{
+        if(resp.error){
+          updateSyncStatus('erro', 'Login cancelado ou recusado');
+          return;
+        }
+        accessToken = resp.access_token;
+        await afterSignIn();
+      }
+    });
+  }
+  tokenClient.requestAccessToken({prompt: accessToken ? '' : 'consent'});
+});
+
+async function afterSignIn(){
+  updateSyncStatus('conectando', 'Conectando...');
+  document.getElementById('btnConectar').textContent = 'Reconectar Google Drive';
+  try{
+    const info = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers:{ Authorization:'Bearer ' + accessToken }
+    }).then(r=>r.json());
+    userEmail = info.email || '';
+  }catch(e){ userEmail = ''; }
+  await loadFromDrive();
+}
+
+async function findDriveFile(){
+  const q = encodeURIComponent(`name='${DRIVE_FILE_NAME}' and trashed=false`);
+  const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id,name)`, {
+    headers:{ Authorization:'Bearer ' + accessToken }
+  });
+  if(res.status === 401){ throw new Error('token-expirado'); }
+  const data = await res.json();
+  return (data.files && data.files.length) ? data.files[0].id : null;
+}
+
+async function loadFromDrive(){
+  try{
+    driveFileId = await findDriveFile();
+    if(driveFileId){
+      const res = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`, {
+        headers:{ Authorization:'Bearer ' + accessToken }
+      });
+      const dados = await res.json();
+      if(Array.isArray(dados)) visitas = dados;
+      updateSyncStatus('ok', `Conectado${userEmail ? ' como ' + userEmail : ''} · dados carregados do Drive`);
+    } else {
+      updateSyncStatus('ok', `Conectado${userEmail ? ' como ' + userEmail : ''} · nenhum dado no Drive ainda, será criado ao salvar`);
+    }
+    render();
+  }catch(e){
+    if(e.message === 'token-expirado'){
+      accessToken = null;
+      updateSyncStatus('erro', 'Sessão expirada — clique em "Reconectar Google Drive"');
+    } else {
+      updateSyncStatus('erro', 'Erro ao carregar do Drive');
+    }
+  }
+}
+
+async function saveToDrive(){
+  if(!accessToken) return; // não conectado: fica só local, use export/import
+  updateSyncStatus('salvando', 'Salvando no Drive...');
+  try{
+    const content = JSON.stringify(visitas);
+    if(!driveFileId){
+      driveFileId = await findDriveFile();
+    }
+    if(driveFileId){
+      const res = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`, {
+        method:'PATCH',
+        headers:{ Authorization:'Bearer ' + accessToken, 'Content-Type':'application/json' },
+        body: content
+      });
+      if(res.status === 401) throw new Error('token-expirado');
+    } else {
+      const metadata = { name: DRIVE_FILE_NAME, mimeType:'application/json' };
+      const boundary = 'drivesync' + Date.now();
+      const body =
+        `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n` +
+        `--${boundary}\r\nContent-Type: application/json\r\n\r\n${content}\r\n--${boundary}--`;
+      const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+        method:'POST',
+        headers:{ Authorization:'Bearer ' + accessToken, 'Content-Type':`multipart/related; boundary=${boundary}` },
+        body
+      });
+      if(res.status === 401) throw new Error('token-expirado');
+      const data = await res.json();
+      driveFileId = data.id;
+    }
+    updateSyncStatus('ok', `Conectado${userEmail ? ' como ' + userEmail : ''} · salvo às ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`);
+  }catch(e){
+    if(e.message === 'token-expirado'){
+      accessToken = null;
+      updateSyncStatus('erro', 'Sessão expirada — clique em "Reconectar Google Drive" e salve de novo');
+    } else {
+      updateSyncStatus('erro', 'Erro ao salvar no Drive — seus dados continuam aqui na página, tente de novo');
+    }
+  }
+}
+// ==============================================
+
+document.getElementById('busca').addEventListener('input', render);
+document.getElementById('filtroStatus').addEventListener('change', render);
+document.getElementById('ordenar').addEventListener('change', render);
+
+// Export / Import
+document.getElementById('btnExport').addEventListener('click', ()=>{
+  const blob = new Blob([JSON.stringify(visitas, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'visitas-apartamentos.json';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+document.getElementById('importFile').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    try{
+      const dados = JSON.parse(reader.result);
+      if(Array.isArray(dados)){
+        visitas = dados;
+        render();
+        saveToDrive();
+      } else {
+        alert('Arquivo inválido.');
+      }
+    }catch(err){
+      alert('Não foi possível ler o arquivo. Verifique se é um .json exportado por esta ficha.');
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
+
+render();
+</script>
+</body>
+</html>
