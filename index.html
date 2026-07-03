@@ -180,6 +180,16 @@
     border:none;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer;line-height:1;
   }
   .panel-actions{display:flex;gap:10px;margin-top:18px;justify-content:flex-end;}
+  .pacote-box{
+    background:var(--paper);
+    border:1.5px dashed var(--amber-dark);
+    border-radius:4px;
+    padding:8px 10px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.95rem;
+    font-weight:600;
+    color:var(--ink);
+  }
 
   /* Cards */
   .count-line{
@@ -227,6 +237,7 @@
     white-space:nowrap;
     flex-shrink:0;
   }
+  .stamp.cadastrada{color:#6B6357; background:#EDE9E1;}
   .stamp.agendada{color:var(--ink-soft); background:var(--slate-bg);}
   .stamp.visitada{color:var(--amber-dark); background:#FBF0DD;}
   .stamp.favorita{color:var(--sage); background:var(--sage-bg);}
@@ -289,6 +300,7 @@
       <p>Cada imóvel visto vira uma ficha: link, imobiliária, corretor, cômodos, vagas e suas observações — do jeito que você preencheria uma planilha, mas em cartões.</p>
     </div>
     <div class="stamp-legend">
+      <span><span class="dot" style="background:#6B6357"></span>Cadastrada</span>
       <span><span class="dot" style="background:var(--ink-soft)"></span>Agendada</span>
       <span><span class="dot" style="background:var(--amber-dark)"></span>Visitada</span>
       <span><span class="dot" style="background:var(--sage)"></span>Favorita</span>
@@ -298,20 +310,38 @@
 
   <div class="toolbar">
     <button class="btn amber" id="btnNovo">+ Nova visita</button>
-    <input type="text" id="busca" placeholder="Buscar por nome, imobiliária ou corretor...">
+    <input type="text" id="busca" placeholder="Buscar por nome, endereço, imobiliária ou corretor...">
     <select id="filtroStatus">
       <option value="">Todos os status</option>
+      <option value="cadastrada">Cadastrada</option>
       <option value="agendada">Agendada</option>
       <option value="visitada">Visitada</option>
       <option value="favorita">Favorita</option>
       <option value="descartada">Descartada</option>
     </select>
+    <select id="filtroComodos">
+      <option value="">Qualquer nº de cômodos</option>
+      <option value="1">1+ cômodo</option>
+      <option value="2">2+ cômodos</option>
+      <option value="3">3+ cômodos</option>
+      <option value="4">4+ cômodos</option>
+      <option value="5">5+ cômodos</option>
+    </select>
+    <select id="filtroGaragens">
+      <option value="">Qualquer nº de vagas</option>
+      <option value="1">1+ vaga</option>
+      <option value="2">2+ vagas</option>
+      <option value="3">3+ vagas</option>
+      <option value="4">4+ vagas</option>
+    </select>
     <select id="ordenar">
       <option value="recentes">Mais recentes</option>
       <option value="avaliacao">Melhor avaliação</option>
       <option value="nome">Nome A–Z</option>
+      <option value="pacote">Menor valor do pacote</option>
     </select>
     <button class="btn secondary" id="btnExport">Exportar dados (.json)</button>
+    <button class="btn secondary" id="btnExportCSV">Exportar tabela (.csv)</button>
     <button class="btn secondary file-btn">Importar dados
       <input type="file" id="importFile" accept="application/json">
     </button>
@@ -331,6 +361,10 @@
       <div class="field full">
         <label for="fLink">Link do anúncio</label>
         <input type="url" id="fLink" placeholder="https://...">
+      </div>
+      <div class="field full">
+        <label for="fEndereco">Endereço</label>
+        <input type="text" id="fEndereco" placeholder="Rua, número, bairro, cidade">
       </div>
       <div class="field">
         <label for="fImobiliaria">Imobiliária</label>
@@ -357,12 +391,25 @@
         <input type="number" id="fGaragens" min="0" placeholder="Ex: 1">
       </div>
       <div class="field">
-        <label for="fAluguel">Valor do aluguel (opcional)</label>
-        <input type="text" id="fAluguel" placeholder="Ex: R$ 2.500 + cond.">
+        <label for="fAluguel">Valor do aluguel (R$)</label>
+        <input type="number" id="fAluguel" min="0" step="0.01" placeholder="Ex: 2500">
+      </div>
+      <div class="field">
+        <label for="fCondominio">Valor do condomínio (R$)</label>
+        <input type="number" id="fCondominio" min="0" step="0.01" placeholder="Ex: 450">
+      </div>
+      <div class="field">
+        <label for="fIptu">Valor do IPTU (R$)</label>
+        <input type="number" id="fIptu" min="0" step="0.01" placeholder="Ex: 80">
+      </div>
+      <div class="field">
+        <label>Valor do pacote (soma)</label>
+        <div class="pacote-box" id="pacoteBox">R$ 0,00</div>
       </div>
       <div class="field">
         <label for="fStatus">Status</label>
         <select id="fStatus">
+          <option value="cadastrada">Cadastrada</option>
           <option value="agendada">Agendada</option>
           <option value="visitada">Visitada</option>
           <option value="favorita">Favorita</option>
@@ -430,6 +477,19 @@ const countLine = document.getElementById('countLine');
 
 function uid(){ return 'v' + Date.now() + Math.random().toString(36).slice(2,7); }
 
+function formatBRL(n){
+  return 'R$ ' + (Number(n)||0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function calcPacote(){
+  const a = parseFloat(document.getElementById('fAluguel').value) || 0;
+  const c = parseFloat(document.getElementById('fCondominio').value) || 0;
+  const i = parseFloat(document.getElementById('fIptu').value) || 0;
+  document.getElementById('pacoteBox').textContent = formatBRL(a + c + i);
+}
+['fAluguel','fCondominio','fIptu'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', calcPacote);
+});
+
 function openPanel(edit){
   panel.classList.add('open');
   document.getElementById('panelTitle').textContent = edit ? 'Editar visita' : 'Nova visita';
@@ -440,15 +500,16 @@ function closePanel(){
   clearForm();
 }
 function clearForm(){
-  ['fNome','fLink','fImobiliaria','fCorretor','fTelefone','fData','fComodos','fGaragens','fAluguel','fObs','editId'].forEach(id=>{
+  ['fNome','fLink','fEndereco','fImobiliaria','fCorretor','fTelefone','fData','fComodos','fGaragens','fAluguel','fCondominio','fIptu','fObs','editId'].forEach(id=>{
     document.getElementById(id).value = '';
   });
-  document.getElementById('fStatus').value = 'agendada';
+  document.getElementById('fStatus').value = 'cadastrada';
   currentStars = 0;
   currentPhotos = [];
   renderStars();
   renderPhotoPreview();
   document.getElementById('fFotos').value = '';
+  calcPacote();
 }
 
 document.getElementById('btnNovo').addEventListener('click', ()=>{
@@ -508,17 +569,22 @@ document.getElementById('btnSalvar').addEventListener('click', ()=>{
     return;
   }
   const editId = document.getElementById('editId').value;
+  const aluguel = parseFloat(document.getElementById('fAluguel').value) || 0;
+  const condominio = parseFloat(document.getElementById('fCondominio').value) || 0;
+  const iptu = parseFloat(document.getElementById('fIptu').value) || 0;
   const data = {
     id: editId || uid(),
     nome,
     link: document.getElementById('fLink').value.trim(),
+    endereco: document.getElementById('fEndereco').value.trim(),
     imobiliaria: document.getElementById('fImobiliaria').value.trim(),
     corretor: document.getElementById('fCorretor').value.trim(),
     telefone: document.getElementById('fTelefone').value.trim(),
     dataVisita: document.getElementById('fData').value,
     comodos: document.getElementById('fComodos').value,
     garagens: document.getElementById('fGaragens').value,
-    aluguel: document.getElementById('fAluguel').value.trim(),
+    aluguel, condominio, iptu,
+    pacote: aluguel + condominio + iptu,
     status: document.getElementById('fStatus').value,
     avaliacao: currentStars,
     obs: document.getElementById('fObs').value.trim(),
@@ -541,14 +607,18 @@ function editVisita(id){
   document.getElementById('editId').value = v.id;
   document.getElementById('fNome').value = v.nome;
   document.getElementById('fLink').value = v.link;
+  document.getElementById('fEndereco').value = v.endereco || '';
   document.getElementById('fImobiliaria').value = v.imobiliaria;
   document.getElementById('fCorretor').value = v.corretor;
   document.getElementById('fTelefone').value = v.telefone;
   document.getElementById('fData').value = v.dataVisita;
   document.getElementById('fComodos').value = v.comodos;
   document.getElementById('fGaragens').value = v.garagens;
-  document.getElementById('fAluguel').value = v.aluguel;
+  document.getElementById('fAluguel').value = v.aluguel || '';
+  document.getElementById('fCondominio').value = v.condominio || '';
+  document.getElementById('fIptu').value = v.iptu || '';
   document.getElementById('fStatus').value = v.status;
+  calcPacote();
   currentStars = v.avaliacao || 0;
   currentPhotos = (v.fotos || []).slice();
   renderStars();
@@ -564,21 +634,26 @@ function excluirVisita(id){
 
 // Render list
 function statusLabel(s){
-  return {agendada:'Agendada', visitada:'Visitada', favorita:'Favorita', descartada:'Descartada'}[s] || s;
+  return {cadastrada:'Cadastrada', agendada:'Agendada', visitada:'Visitada', favorita:'Favorita', descartada:'Descartada'}[s] || s;
 }
 function render(){
   const busca = document.getElementById('busca').value.toLowerCase();
   const filtro = document.getElementById('filtroStatus').value;
+  const minComodos = Number(document.getElementById('filtroComodos').value) || 0;
+  const minGaragens = Number(document.getElementById('filtroGaragens').value) || 0;
   const ordenar = document.getElementById('ordenar').value;
 
   let lista = visitas.filter(v=>{
-    const matchBusca = !busca || [v.nome, v.imobiliaria, v.corretor].some(x => (x||'').toLowerCase().includes(busca));
+    const matchBusca = !busca || [v.nome, v.endereco, v.imobiliaria, v.corretor].some(x => (x||'').toLowerCase().includes(busca));
     const matchStatus = !filtro || v.status === filtro;
-    return matchBusca && matchStatus;
+    const matchComodos = !minComodos || Number(v.comodos||0) >= minComodos;
+    const matchGaragens = !minGaragens || Number(v.garagens||0) >= minGaragens;
+    return matchBusca && matchStatus && matchComodos && matchGaragens;
   });
 
   if(ordenar === 'avaliacao') lista.sort((a,b)=>(b.avaliacao||0)-(a.avaliacao||0));
   else if(ordenar === 'nome') lista.sort((a,b)=>a.nome.localeCompare(b.nome));
+  else if(ordenar === 'pacote') lista.sort((a,b)=>(a.pacote||0)-(b.pacote||0));
   else lista.sort((a,b)=>b.criadoEm-a.criadoEm);
 
   cardsEl.innerHTML = '';
@@ -598,6 +673,9 @@ function render(){
         <span class="stamp ${v.status}">${statusLabel(v.status)}</span>
       </div>
       <div class="meta-line">
+        ${v.endereco ? `<span><b>Endereço:</b> ${v.endereco}</span>` : ''}
+      </div>
+      <div class="meta-line">
         ${v.imobiliaria ? `<span><b>Imobiliária:</b> ${v.imobiliaria}</span>` : ''}
         ${v.corretor ? `<span><b>Corretor:</b> ${v.corretor}</span>` : ''}
         ${v.telefone ? `<span><b>Tel:</b> ${v.telefone}</span>` : ''}
@@ -605,7 +683,7 @@ function render(){
       <div class="specs">
         ${v.comodos ? `<span class="spec-chip">${v.comodos} cômodo(s)</span>` : ''}
         ${v.garagens ? `<span class="spec-chip">${v.garagens} vaga(s)</span>` : ''}
-        ${v.aluguel ? `<span class="spec-chip">${v.aluguel}</span>` : ''}
+        ${v.pacote ? `<span class="spec-chip">Pacote: ${formatBRL(v.pacote)}</span>` : ''}
         ${dataFmt ? `<span class="spec-chip">${dataFmt}</span>` : ''}
       </div>
       ${v.avaliacao ? `<div class="stars-view">${stars}</div>` : ''}
@@ -743,7 +821,28 @@ async function saveToDrive(){
 
 document.getElementById('busca').addEventListener('input', render);
 document.getElementById('filtroStatus').addEventListener('change', render);
+document.getElementById('filtroComodos').addEventListener('change', render);
+document.getElementById('filtroGaragens').addEventListener('change', render);
 document.getElementById('ordenar').addEventListener('change', render);
+
+// Export CSV (pronto para importar como camada no Google My Maps: mymaps.google.com)
+document.getElementById('btnExportCSV').addEventListener('click', ()=>{
+  const cols = ['Nome','Endereco','Status','Comodos','Vagas','Aluguel','Condominio','IPTU','ValorPacote','Avaliacao','Imobiliaria','Corretor','Telefone','Link','Observacoes'];
+  const esc = (v)=> `"${String(v ?? '').replace(/"/g,'""')}"`;
+  const linhas = visitas.map(v => [
+    v.nome, v.endereco, statusLabel(v.status), v.comodos, v.garagens,
+    v.aluguel||0, v.condominio||0, v.iptu||0, v.pacote||0, v.avaliacao||0,
+    v.imobiliaria, v.corretor, v.telefone, v.link, v.obs
+  ].map(esc).join(','));
+  const csv = '\uFEFF' + cols.map(esc).join(',') + '\n' + linhas.join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'visitas-apartamentos.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+});
 
 // Export / Import
 document.getElementById('btnExport').addEventListener('click', ()=>{
