@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Opções de apartamento — visualização</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F4F5F0;
+    --grid-line:#D8DED3;
+    --ink:#16324F;
+    --ink-soft:#3E5670;
+    --amber:#E8A33D;
+    --amber-dark:#C97F1B;
+    --sage:#4C7A5D;
+    --sage-bg:#E4EEE7;
+    --terracotta:#C4472F;
+    --terracotta-bg:#F5E1DC;
+    --slate-bg:#E3E8ED;
+    --card-bg:#FFFFFF;
+    --line:#C9CFC5;
+    --shadow:0 2px 8px rgba(22,50,79,0.08), 0 1px 2px rgba(22,50,79,0.06);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
+      var(--paper);
+    background-size:28px 28px;
+    font-family:'IBM Plex Sans', sans-serif;
+    color:var(--ink);
+    padding:32px 20px 80px;
+  }
+  .wrap{max-width:1080px;margin:0 auto;}
+  header.top{
+    border-bottom:2px solid var(--ink);
+    padding-bottom:18px;
+    margin-bottom:28px;
+  }
+  header.top h1{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:clamp(1.5rem, 3vw, 2.1rem);
+    margin:0;
+    letter-spacing:-0.02em;
+  }
+  header.top h1 span{color:var(--amber-dark);}
+  header.top p{
+    margin:6px 0 0;
+    color:var(--ink-soft);
+    font-size:0.9rem;
+  }
+  .count-line{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.78rem;
+    color:var(--ink-soft);
+    margin:0 0 14px;
+  }
+  .cards{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(280px,1fr));
+    gap:20px;
+  }
+  .card{
+    background:var(--card-bg);
+    border:1.5px solid var(--ink);
+    border-radius:6px;
+    box-shadow:var(--shadow);
+    padding:18px 18px 16px;
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .card::before{
+    content:"";
+    position:absolute;
+    top:-1px; left:14px; right:14px;
+    height:0;
+    border-top:2px dashed var(--line);
+  }
+  .card-head{display:flex; justify-content:space-between; align-items:flex-start; gap:10px;}
+  .card-title{font-family:'Space Grotesk', sans-serif; font-size:1.05rem; margin:0; line-height:1.25;}
+  .card-title a{color:var(--ink); text-decoration:none; border-bottom:1.5px solid var(--amber-dark);}
+  .stamp{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.66rem;
+    font-weight:600;
+    text-transform:uppercase;
+    letter-spacing:0.05em;
+    padding:4px 9px;
+    border-radius:2px;
+    border:1.5px solid currentColor;
+    transform:rotate(-6deg);
+    white-space:nowrap;
+    flex-shrink:0;
+  }
+  .stamp.cadastrada{color:#6B6357; background:#EDE9E1;}
+  .stamp.agendada{color:var(--ink-soft); background:var(--slate-bg);}
+  .stamp.visitada{color:var(--amber-dark); background:#FBF0DD;}
+  .stamp.favorita{color:var(--sage); background:var(--sage-bg);}
+  .stamp.descartada{color:var(--terracotta); background:var(--terracotta-bg);}
+  .meta-line{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.82rem;
+    color:var(--ink-soft);
+    display:flex;
+    flex-wrap:wrap;
+    gap:4px 14px;
+  }
+  .meta-line b{color:var(--ink); font-weight:600;}
+  .specs{display:flex; gap:10px; flex-wrap:wrap; font-family:'IBM Plex Mono', monospace; font-size:0.78rem;}
+  .spec-chip{background:var(--paper); border:1px solid var(--line); border-radius:3px; padding:4px 8px;}
+  .obs{font-size:0.85rem; color:var(--ink-soft); line-height:1.4;}
+  .stars-view{font-size:0.95rem; color:var(--amber-dark); letter-spacing:2px;}
+  .card-photos{display:flex; gap:6px; flex-wrap:wrap;}
+  .card-photos img{width:72px;height:72px;object-fit:cover;border-radius:4px;border:1px solid var(--line);}
+  .empty{
+    text-align:center;
+    padding:60px 20px;
+    border:1.5px dashed var(--line);
+    border-radius:6px;
+    color:var(--ink-soft);
+    font-family:'IBM Plex Mono', monospace;
+    font-size:0.85rem;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>Opções de apartamento <span>— só visualização</span></h1>
+    <p>Essas são as fichas que estou avaliando no momento. Esta página é só para consulta, sem login necessário.</p>
+  </header>
+  <p class="count-line" id="countLine"></p>
+  <div class="cards" id="cards"></div>
+  <div class="empty" id="emptyState" style="display:none;">
+    Nenhum dado encontrado. Peça para quem te enviou o link gerar novamente o arquivo de compartilhamento.
+  </div>
+</div>
+
+<script>
+function statusLabel(s){
+  return {cadastrada:'Cadastrada', agendada:'Agendada', visitada:'Visitada', favorita:'Favorita', descartada:'Descartada'}[s] || s;
+}
+function formatBRL(n){
+  return 'R$ ' + (Number(n)||0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+fetch('./dados-compartilhados.json', {cache:'no-store'})
+  .then(r => { if(!r.ok) throw new Error('sem arquivo'); return r.json(); })
+  .then(visitas => render(Array.isArray(visitas) ? visitas : []))
+  .catch(()=> render([]));
+
+function render(visitas){
+  const cardsEl = document.getElementById('cards');
+  const emptyState = document.getElementById('emptyState');
+  const countLine = document.getElementById('countLine');
+
+  emptyState.style.display = visitas.length ? 'none' : 'block';
+  countLine.textContent = visitas.length ? `${visitas.length} imóvel(is)` : '';
+
+  visitas
+    .slice()
+    .sort((a,b)=>(b.criadoEm||0)-(a.criadoEm||0))
+    .forEach(v=>{
+      const card = document.createElement('div');
+      card.className = 'card';
+      const stars = '★'.repeat(v.avaliacao||0) + '☆'.repeat(5-(v.avaliacao||0));
+      const dataFmt = v.dataVisita ? new Date(v.dataVisita).toLocaleString('pt-BR', {dateStyle:'short', timeStyle:'short'}) : '';
+      card.innerHTML = `
+        <div class="card-head">
+          <h3 class="card-title">${v.link ? `<a href="${v.link}" target="_blank" rel="noopener">${v.nome}</a>` : v.nome}</h3>
+          <span class="stamp ${v.status}">${statusLabel(v.status)}</span>
+        </div>
+        <div class="meta-line">
+          ${v.endereco ? `<span><b>Endereço:</b> ${v.endereco}</span>` : ''}
+        </div>
+        <div class="meta-line">
+          ${v.imobiliaria ? `<span><b>Imobiliária:</b> ${v.imobiliaria}</span>` : ''}
+          ${v.corretor ? `<span><b>Corretor:</b> ${v.corretor}</span>` : ''}
+          ${v.telefone ? `<span><b>Tel:</b> ${v.telefone}</span>` : ''}
+        </div>
+        <div class="specs">
+          ${v.comodos ? `<span class="spec-chip">${v.comodos} cômodo(s)</span>` : ''}
+          ${v.metragem ? `<span class="spec-chip">${v.metragem} m²</span>` : ''}
+          ${v.garagens ? `<span class="spec-chip">${v.garagens} vaga(s)</span>` : ''}
+          ${v.pacote ? `<span class="spec-chip">Pacote: ${formatBRL(v.pacote)}</span>` : ''}
+          ${dataFmt ? `<span class="spec-chip">${dataFmt}</span>` : ''}
+        </div>
+        ${v.avaliacao ? `<div class="stars-view">${stars}</div>` : ''}
+        ${v.obs ? `<div class="obs">${v.obs}</div>` : ''}
+        ${v.fotos && v.fotos.length ? `<div class="card-photos">${v.fotos.map(f=>`<img src="${f}">`).join('')}</div>` : ''}
+      `;
+      cardsEl.appendChild(card);
+    });
+}
+</script>
+</body>
+</html>

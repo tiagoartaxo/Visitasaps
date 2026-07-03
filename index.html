@@ -342,6 +342,7 @@
     </select>
     <button class="btn secondary" id="btnExport">Exportar dados (.json)</button>
     <button class="btn secondary" id="btnExportCSV">Exportar tabela (.csv)</button>
+    <button class="btn secondary" id="btnShare">Gerar dados p/ link de amigos</button>
     <button class="btn secondary file-btn">Importar dados
       <input type="file" id="importFile" accept="application/json">
     </button>
@@ -385,6 +386,10 @@
       <div class="field">
         <label for="fComodos">Número de cômodos</label>
         <input type="number" id="fComodos" min="0" placeholder="Ex: 4">
+      </div>
+      <div class="field">
+        <label for="fMetragem">Metragem (m²)</label>
+        <input type="number" id="fMetragem" min="0" step="0.1" placeholder="Ex: 65">
       </div>
       <div class="field">
         <label for="fGaragens">Vagas de garagem</label>
@@ -500,7 +505,7 @@ function closePanel(){
   clearForm();
 }
 function clearForm(){
-  ['fNome','fLink','fEndereco','fImobiliaria','fCorretor','fTelefone','fData','fComodos','fGaragens','fAluguel','fCondominio','fIptu','fObs','editId'].forEach(id=>{
+  ['fNome','fLink','fEndereco','fImobiliaria','fCorretor','fTelefone','fData','fComodos','fMetragem','fGaragens','fAluguel','fCondominio','fIptu','fObs','editId'].forEach(id=>{
     document.getElementById(id).value = '';
   });
   document.getElementById('fStatus').value = 'cadastrada';
@@ -517,6 +522,18 @@ document.getElementById('btnNovo').addEventListener('click', ()=>{
   openPanel(false);
 });
 document.getElementById('btnCancelar').addEventListener('click', closePanel);
+
+// Autopreenchimento: se o corretor já foi cadastrado antes, puxa imobiliária e telefone
+document.getElementById('fCorretor').addEventListener('blur', ()=>{
+  const nomeCorretor = document.getElementById('fCorretor').value.trim().toLowerCase();
+  if(!nomeCorretor) return;
+  const anterior = visitas.find(v => (v.corretor||'').trim().toLowerCase() === nomeCorretor);
+  if(!anterior) return;
+  const fImob = document.getElementById('fImobiliaria');
+  const fTel = document.getElementById('fTelefone');
+  if(!fImob.value.trim() && anterior.imobiliaria) fImob.value = anterior.imobiliaria;
+  if(!fTel.value.trim() && anterior.telefone) fTel.value = anterior.telefone;
+});
 
 // Stars
 function renderStars(){
@@ -582,6 +599,7 @@ document.getElementById('btnSalvar').addEventListener('click', ()=>{
     telefone: document.getElementById('fTelefone').value.trim(),
     dataVisita: document.getElementById('fData').value,
     comodos: document.getElementById('fComodos').value,
+    metragem: document.getElementById('fMetragem').value,
     garagens: document.getElementById('fGaragens').value,
     aluguel, condominio, iptu,
     pacote: aluguel + condominio + iptu,
@@ -613,6 +631,7 @@ function editVisita(id){
   document.getElementById('fTelefone').value = v.telefone;
   document.getElementById('fData').value = v.dataVisita;
   document.getElementById('fComodos').value = v.comodos;
+  document.getElementById('fMetragem').value = v.metragem || '';
   document.getElementById('fGaragens').value = v.garagens;
   document.getElementById('fAluguel').value = v.aluguel || '';
   document.getElementById('fCondominio').value = v.condominio || '';
@@ -682,6 +701,7 @@ function render(){
       </div>
       <div class="specs">
         ${v.comodos ? `<span class="spec-chip">${v.comodos} cômodo(s)</span>` : ''}
+        ${v.metragem ? `<span class="spec-chip">${v.metragem} m²</span>` : ''}
         ${v.garagens ? `<span class="spec-chip">${v.garagens} vaga(s)</span>` : ''}
         ${v.pacote ? `<span class="spec-chip">Pacote: ${formatBRL(v.pacote)}</span>` : ''}
         ${dataFmt ? `<span class="spec-chip">${dataFmt}</span>` : ''}
@@ -699,10 +719,32 @@ function render(){
 }
 
 // ===== SINCRONIZAÇÃO COM O GOOGLE DRIVE =====
+let explicitClick = false;
+
 function updateSyncStatus(kind, text){
   const box = document.getElementById('syncStatus');
   box.className = 'sync-status ' + kind;
   document.getElementById('syncText').textContent = text;
+}
+
+function ensureTokenClient(){
+  if(tokenClient) return true;
+  if(!window.google || !google.accounts || !google.accounts.oauth2) return false;
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID,
+    scope: DRIVE_SCOPE,
+    callback: async (resp)=>{
+      if(resp.error){
+        if(explicitClick){
+          updateSyncStatus('erro', 'Login cancelado ou recusado');
+        }
+        return;
+      }
+      accessToken = resp.access_token;
+      await afterSignIn();
+    }
+  });
+  return true;
 }
 
 document.getElementById('btnConectar').addEventListener('click', ()=>{
@@ -710,26 +752,30 @@ document.getElementById('btnConectar').addEventListener('click', ()=>{
     alert('Antes de conectar: cole o seu Client ID do Google Cloud Console na constante CLIENT_ID, no início do código.');
     return;
   }
-  if(!window.google || !google.accounts || !google.accounts.oauth2){
+  if(!ensureTokenClient()){
     alert('O Google ainda está carregando. Aguarde um instante e clique de novo.');
     return;
   }
-  if(!tokenClient){
-    tokenClient = google.accounts.oauth2.initTokenClient({
-      client_id: CLIENT_ID,
-      scope: DRIVE_SCOPE,
-      callback: async (resp)=>{
-        if(resp.error){
-          updateSyncStatus('erro', 'Login cancelado ou recusado');
-          return;
-        }
-        accessToken = resp.access_token;
-        await afterSignIn();
-      }
-    });
-  }
+  explicitClick = true;
   tokenClient.requestAccessToken({prompt: accessToken ? '' : 'consent'});
 });
+
+// Ao abrir a página, tenta reconectar automaticamente e sem popup,
+// aproveitando que você já autorizou o acesso antes nesse navegador.
+(function tentarReconexaoSilenciosa(){
+  let tentativas = 0;
+  const tentar = ()=>{
+    if(CLIENT_ID.startsWith('COLE_AQUI')) return;
+    if(ensureTokenClient()){
+      explicitClick = false;
+      tokenClient.requestAccessToken({prompt:'none'});
+    } else if(tentativas < 20){
+      tentativas++;
+      setTimeout(tentar, 250);
+    }
+  };
+  tentar();
+})();
 
 async function afterSignIn(){
   updateSyncStatus('conectando', 'Conectando...');
@@ -827,10 +873,10 @@ document.getElementById('ordenar').addEventListener('change', render);
 
 // Export CSV (pronto para importar como camada no Google My Maps: mymaps.google.com)
 document.getElementById('btnExportCSV').addEventListener('click', ()=>{
-  const cols = ['Nome','Endereco','Status','Comodos','Vagas','Aluguel','Condominio','IPTU','ValorPacote','Avaliacao','Imobiliaria','Corretor','Telefone','Link','Observacoes'];
+  const cols = ['Nome','Endereco','Status','Comodos','Metragem','Vagas','Aluguel','Condominio','IPTU','ValorPacote','Avaliacao','Imobiliaria','Corretor','Telefone','Link','Observacoes'];
   const esc = (v)=> `"${String(v ?? '').replace(/"/g,'""')}"`;
   const linhas = visitas.map(v => [
-    v.nome, v.endereco, statusLabel(v.status), v.comodos, v.garagens,
+    v.nome, v.endereco, statusLabel(v.status), v.comodos, v.metragem, v.garagens,
     v.aluguel||0, v.condominio||0, v.iptu||0, v.pacote||0, v.avaliacao||0,
     v.imobiliaria, v.corretor, v.telefone, v.link, v.obs
   ].map(esc).join(','));
@@ -842,6 +888,19 @@ document.getElementById('btnExportCSV').addEventListener('click', ()=>{
   a.download = 'visitas-apartamentos.csv';
   a.click();
   URL.revokeObjectURL(url);
+});
+
+// Gera o arquivo com nome fixo que o view.html (link de visualização) vai ler.
+// Ele NÃO tem login nem edição — é só a "vitrine" para mandar pra alguém ver.
+document.getElementById('btnShare').addEventListener('click', ()=>{
+  const blob = new Blob([JSON.stringify(visitas, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'dados-compartilhados.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  alert('Arquivo "dados-compartilhados.json" baixado.\n\nSuba ele para a MESMA pasta do repositório no GitHub (substituindo o anterior, se já existir).\nO link de visualização para seus amigos é a página view.html publicada junto com esse arquivo.');
 });
 
 // Export / Import
