@@ -6,7 +6,9 @@
 <title>Ficha de Visitas — Caça ao Apê</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
   :root{
     --paper:#F4F5F0;
@@ -342,13 +344,18 @@
     </select>
     <button class="btn secondary" id="btnExport">Exportar dados (.json)</button>
     <button class="btn secondary" id="btnExportCSV">Exportar tabela (.csv)</button>
-    <button class="btn secondary" id="btnShare">Gerar dados p/ link de amigos</button>
     <button class="btn secondary file-btn">Importar dados
       <input type="file" id="importFile" accept="application/json">
     </button>
-    <button class="btn amber" id="btnConectar">Conectar Google Drive</button>
+    <button class="btn amber" id="btnConectar">Entrar com Google</button>
+    <button class="btn secondary" id="btnSair" style="display:none;">Sair</button>
   </div>
-  <div class="sync-status" id="syncStatus"><span class="dot"></span><span id="syncText">Não conectado — os dados ficam só nesta aba até você conectar o Drive ou exportar</span></div>
+  <div class="sync-status" id="syncStatus"><span class="dot"></span><span id="syncText">Não conectado — os dados ficam só nesta aba até você entrar com Google ou exportar</span></div>
+  <div class="sync-status" id="uidRow" style="display:none;">
+    <span class="dot" style="background:transparent;"></span>
+    <span>Seu UID (usar na regra de segurança do Firestore): <code id="uidText" style="font-weight:600;"></code></span>
+    <button class="btn secondary small" id="btnCopyUid" type="button">Copiar</button>
+  </div>
 
   <!-- Form Panel -->
   <div class="panel" id="panel">
@@ -454,22 +461,34 @@
   </div>
 
   <p class="footnote">
-    Os dados ficam apenas na memória desta página — use "Exportar dados" para salvar um backup em .json<br>
-    e "Importar dados" para recarregá-lo depois (inclusive ao reabrir a página no Google Sites).
+    Conecte com sua conta Google para salvar automaticamente na nuvem (Firestore) e manter tudo sincronizado entre dispositivos.<br>
+    Sem conexão, os dados ficam só nesta aba — use "Exportar dados" para um backup em .json.
   </p>
 </div>
 
 <script>
-// ===== CONFIGURAÇÃO DO GOOGLE DRIVE =====
-// Cole aqui o Client ID que você criar no Google Cloud Console (passo a passo que te enviei).
-const CLIENT_ID = '2974154954-4d75ohgd42tf0kjl31o0b194nrg9p2n8.apps.googleusercontent.com';
-const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
-const DRIVE_FILE_NAME = 'visitas-apartamentos-dados.json';
-let accessToken = null;
-let driveFileId = null;
-let tokenClient = null;
+// ===== CONFIGURAÇÃO DO FIREBASE =====
+// Cole aqui o objeto de configuração que o Firebase Console te dá em:
+// Configurações do projeto → Geral → Seus apps → app Web (</>)
+const firebaseConfig = {
+  apiKey: "AIzaSyCSVXGpSKxw2c_PTK1ZgHq33YwSJvrwVR8",
+  authDomain: "minha-vm-432716.firebaseapp.com",
+  projectId: "minha-vm-432716",
+  storageBucket: "minha-vm-432716.firebasestorage.app",
+  messagingSenderId: "2974154954",
+  appId: "1:2974154954:web:98785c7648d8cd37213433"
+};
+let firebaseReady = !firebaseConfig.apiKey.startsWith('COLE_AQUI');
+let auth, db, docRef;
 let userEmail = '';
-// ==========================================
+let userUid = '';
+if(firebaseReady){
+  firebase.initializeApp(firebaseConfig);
+  auth = firebase.auth();
+  db = firebase.firestore();
+  docRef = db.collection('visitas').doc('dados');
+}
+// ======================================
 
 let visitas = [];
 let currentStars = 0;
@@ -616,7 +635,7 @@ document.getElementById('btnSalvar').addEventListener('click', ()=>{
   }
   closePanel();
   render();
-  saveToDrive();
+  saveToFirestore();
 });
 
 function editVisita(id){
@@ -648,7 +667,7 @@ function excluirVisita(id){
   if(!confirm('Excluir esta ficha de visita?')) return;
   visitas = visitas.filter(v=>v.id!==id);
   render();
-  saveToDrive();
+  saveToFirestore();
 }
 
 // Render list
@@ -718,149 +737,88 @@ function render(){
   });
 }
 
-// ===== SINCRONIZAÇÃO COM O GOOGLE DRIVE =====
-let explicitClick = false;
-
+// ===== SINCRONIZAÇÃO COM O FIREBASE (AUTH + FIRESTORE) =====
 function updateSyncStatus(kind, text){
   const box = document.getElementById('syncStatus');
   box.className = 'sync-status ' + kind;
   document.getElementById('syncText').textContent = text;
 }
 
-function ensureTokenClient(){
-  if(tokenClient) return true;
-  if(!window.google || !google.accounts || !google.accounts.oauth2) return false;
-  tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: CLIENT_ID,
-    scope: DRIVE_SCOPE,
-    callback: async (resp)=>{
-      if(resp.error){
-        if(explicitClick){
-          updateSyncStatus('erro', 'Login cancelado ou recusado');
-        }
-        return;
-      }
-      accessToken = resp.access_token;
-      await afterSignIn();
-    }
-  });
-  return true;
+function showUid(uid){
+  const row = document.getElementById('uidRow');
+  if(!uid){ row.style.display = 'none'; return; }
+  row.style.display = 'flex';
+  document.getElementById('uidText').textContent = uid;
 }
 
 document.getElementById('btnConectar').addEventListener('click', ()=>{
-  if(CLIENT_ID.startsWith('COLE_AQUI')){
-    alert('Antes de conectar: cole o seu Client ID do Google Cloud Console na constante CLIENT_ID, no início do código.');
+  if(!firebaseReady){
+    alert('Antes de conectar: cole a configuração do Firebase (firebaseConfig) no início do código.');
     return;
   }
-  if(!ensureTokenClient()){
-    alert('O Google ainda está carregando. Aguarde um instante e clique de novo.');
-    return;
-  }
-  explicitClick = true;
-  tokenClient.requestAccessToken({prompt: accessToken ? '' : 'consent'});
+  const provider = new firebase.auth.GoogleAuthProvider();
+  updateSyncStatus('conectando', 'Conectando...');
+  auth.signInWithPopup(provider).catch(err=>{
+    updateSyncStatus('erro', 'Login cancelado ou recusado (' + err.code + ')');
+  });
 });
 
-// Ao abrir a página, tenta reconectar automaticamente e sem popup,
-// aproveitando que você já autorizou o acesso antes nesse navegador.
-(function tentarReconexaoSilenciosa(){
-  let tentativas = 0;
-  const tentar = ()=>{
-    if(CLIENT_ID.startsWith('COLE_AQUI')) return;
-    if(ensureTokenClient()){
-      explicitClick = false;
-      tokenClient.requestAccessToken({prompt:'none'});
-    } else if(tentativas < 20){
-      tentativas++;
-      setTimeout(tentar, 250);
-    }
-  };
-  tentar();
-})();
+document.getElementById('btnSair').addEventListener('click', ()=>{
+  if(firebaseReady) auth.signOut();
+});
 
-async function afterSignIn(){
-  updateSyncStatus('conectando', 'Conectando...');
-  document.getElementById('btnConectar').textContent = 'Reconectar Google Drive';
-  try{
-    const info = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-      headers:{ Authorization:'Bearer ' + accessToken }
-    }).then(r=>r.json());
-    userEmail = info.email || '';
-  }catch(e){ userEmail = ''; }
-  await loadFromDrive();
-}
+document.getElementById('btnCopyUid').addEventListener('click', ()=>{
+  navigator.clipboard.writeText(userUid);
+});
 
-async function findDriveFile(){
-  const q = encodeURIComponent(`name='${DRIVE_FILE_NAME}' and trashed=false`);
-  const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id,name)`, {
-    headers:{ Authorization:'Bearer ' + accessToken }
-  });
-  if(res.status === 401){ throw new Error('token-expirado'); }
-  const data = await res.json();
-  return (data.files && data.files.length) ? data.files[0].id : null;
-}
-
-async function loadFromDrive(){
-  try{
-    driveFileId = await findDriveFile();
-    if(driveFileId){
-      const res = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`, {
-        headers:{ Authorization:'Bearer ' + accessToken }
-      });
-      const dados = await res.json();
-      if(Array.isArray(dados)) visitas = dados;
-      updateSyncStatus('ok', `Conectado${userEmail ? ' como ' + userEmail : ''} · dados carregados do Drive`);
+if(firebaseReady){
+  // onAuthStateChanged detecta login automaticamente ao abrir a página,
+  // sem precisar de popup ou reconexão manual — a sessão fica salva pelo Firebase.
+  auth.onAuthStateChanged(async (user)=>{
+    if(user){
+      userEmail = user.email || '';
+      userUid = user.uid;
+      showUid(userUid);
+      document.getElementById('btnConectar').style.display = 'none';
+      document.getElementById('btnSair').style.display = 'inline-block';
+      await loadFromFirestore();
     } else {
-      updateSyncStatus('ok', `Conectado${userEmail ? ' como ' + userEmail : ''} · nenhum dado no Drive ainda, será criado ao salvar`);
+      userEmail = '';
+      userUid = '';
+      showUid('');
+      document.getElementById('btnConectar').style.display = 'inline-block';
+      document.getElementById('btnConectar').textContent = 'Entrar com Google';
+      document.getElementById('btnSair').style.display = 'none';
+      updateSyncStatus('', 'Não conectado — os dados ficam só nesta aba até você entrar com Google ou exportar');
+    }
+  });
+} else {
+  updateSyncStatus('erro', 'Firebase não configurado ainda — cole o firebaseConfig no início do código');
+}
+
+async function loadFromFirestore(){
+  try{
+    const snap = await docRef.get();
+    if(snap.exists){
+      visitas = snap.data().lista || [];
+      updateSyncStatus('ok', `Conectado como ${userEmail} · dados carregados do Firestore`);
+    } else {
+      updateSyncStatus('ok', `Conectado como ${userEmail} · nenhum dado salvo ainda, será criado ao salvar`);
     }
     render();
   }catch(e){
-    if(e.message === 'token-expirado'){
-      accessToken = null;
-      updateSyncStatus('erro', 'Sessão expirada — clique em "Reconectar Google Drive"');
-    } else {
-      updateSyncStatus('erro', 'Erro ao carregar do Drive');
-    }
+    updateSyncStatus('erro', 'Erro ao carregar do Firestore: ' + e.message);
   }
 }
 
-async function saveToDrive(){
-  if(!accessToken) return; // não conectado: fica só local, use export/import
-  updateSyncStatus('salvando', 'Salvando no Drive...');
+async function saveToFirestore(){
+  if(!firebaseReady || !auth.currentUser) return; // não conectado: fica só local, use export/import
+  updateSyncStatus('salvando', 'Salvando na nuvem...');
   try{
-    const content = JSON.stringify(visitas);
-    if(!driveFileId){
-      driveFileId = await findDriveFile();
-    }
-    if(driveFileId){
-      const res = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`, {
-        method:'PATCH',
-        headers:{ Authorization:'Bearer ' + accessToken, 'Content-Type':'application/json' },
-        body: content
-      });
-      if(res.status === 401) throw new Error('token-expirado');
-    } else {
-      const metadata = { name: DRIVE_FILE_NAME, mimeType:'application/json' };
-      const boundary = 'drivesync' + Date.now();
-      const body =
-        `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n` +
-        `--${boundary}\r\nContent-Type: application/json\r\n\r\n${content}\r\n--${boundary}--`;
-      const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-        method:'POST',
-        headers:{ Authorization:'Bearer ' + accessToken, 'Content-Type':`multipart/related; boundary=${boundary}` },
-        body
-      });
-      if(res.status === 401) throw new Error('token-expirado');
-      const data = await res.json();
-      driveFileId = data.id;
-    }
-    updateSyncStatus('ok', `Conectado${userEmail ? ' como ' + userEmail : ''} · salvo às ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`);
+    await docRef.set({ lista: visitas, atualizadoEm: Date.now() });
+    updateSyncStatus('ok', `Conectado como ${userEmail} · salvo às ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`);
   }catch(e){
-    if(e.message === 'token-expirado'){
-      accessToken = null;
-      updateSyncStatus('erro', 'Sessão expirada — clique em "Reconectar Google Drive" e salve de novo');
-    } else {
-      updateSyncStatus('erro', 'Erro ao salvar no Drive — seus dados continuam aqui na página, tente de novo');
-    }
+    updateSyncStatus('erro', 'Erro ao salvar na nuvem — seus dados continuam aqui na página: ' + e.message);
   }
 }
 // ==============================================
@@ -890,19 +848,6 @@ document.getElementById('btnExportCSV').addEventListener('click', ()=>{
   URL.revokeObjectURL(url);
 });
 
-// Gera o arquivo com nome fixo que o view.html (link de visualização) vai ler.
-// Ele NÃO tem login nem edição — é só a "vitrine" para mandar pra alguém ver.
-document.getElementById('btnShare').addEventListener('click', ()=>{
-  const blob = new Blob([JSON.stringify(visitas, null, 2)], {type:'application/json'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'dados-compartilhados.json';
-  a.click();
-  URL.revokeObjectURL(url);
-  alert('Arquivo "dados-compartilhados.json" baixado.\n\nSuba ele para a MESMA pasta do repositório no GitHub (substituindo o anterior, se já existir).\nO link de visualização para seus amigos é a página view.html publicada junto com esse arquivo.');
-});
-
 // Export / Import
 document.getElementById('btnExport').addEventListener('click', ()=>{
   const blob = new Blob([JSON.stringify(visitas, null, 2)], {type:'application/json'});
@@ -923,7 +868,7 @@ document.getElementById('importFile').addEventListener('change', (e)=>{
       if(Array.isArray(dados)){
         visitas = dados;
         render();
-        saveToDrive();
+        saveToFirestore();
       } else {
         alert('Arquivo inválido.');
       }

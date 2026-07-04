@@ -6,6 +6,8 @@
 <title>Opções de apartamento — visualização</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
   :root{
     --paper:#F4F5F0;
@@ -150,10 +152,40 @@ function formatBRL(n){
   return 'R$ ' + (Number(n)||0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
 }
 
-fetch('./dados-compartilhados.json', {cache:'no-store'})
-  .then(r => { if(!r.ok) throw new Error('sem arquivo'); return r.json(); })
-  .then(visitas => render(Array.isArray(visitas) ? visitas : []))
-  .catch(()=> render([]));
+// Mesma configuração do Firebase usada no editor (esse config não é secreto —
+// a segurança de verdade vem das regras do Firestore, que só permitem leitura pública).
+const firebaseConfig = {
+  apiKey: "AIzaSyCSVXGpSKxw2c_PTK1ZgHq33YwSJvrwVR8",
+  authDomain: "minha-vm-432716.firebaseapp.com",
+  projectId: "minha-vm-432716",
+  storageBucket: "minha-vm-432716.firebasestorage.app",
+  messagingSenderId: "2974154954",
+  appId: "1:2974154954:web:98785c7648d8cd37213433"
+};
+
+function statusLabel(s){
+  return {cadastrada:'Cadastrada', agendada:'Agendada', visitada:'Visitada', favorita:'Favorita', descartada:'Descartada'}[s] || s;
+}
+function formatBRL(n){
+  return 'R$ ' + (Number(n)||0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+if(firebaseConfig.apiKey.startsWith('COLE_AQUI')){
+  document.getElementById('emptyState').style.display = 'block';
+  document.getElementById('emptyState').textContent = 'Página ainda não configurada — falta colar o firebaseConfig no código do view.html.';
+} else {
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  // onSnapshot: atualiza a tela sozinha sempre que os dados mudarem no Firestore,
+  // sem precisar recarregar a página.
+  db.collection('visitas').doc('dados').onSnapshot(
+    snap => render(snap.exists ? (snap.data().lista || []) : []),
+    err => {
+      document.getElementById('emptyState').style.display = 'block';
+      document.getElementById('emptyState').textContent = 'Não foi possível carregar os dados (verifique as regras do Firestore).';
+    }
+  );
+}
 
 function render(visitas){
   const cardsEl = document.getElementById('cards');
@@ -162,6 +194,7 @@ function render(visitas){
 
   emptyState.style.display = visitas.length ? 'none' : 'block';
   countLine.textContent = visitas.length ? `${visitas.length} imóvel(is)` : '';
+  cardsEl.innerHTML = '';
 
   visitas
     .slice()
