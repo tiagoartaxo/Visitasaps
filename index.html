@@ -825,7 +825,7 @@ document.getElementById('btnExportCSV').addEventListener('click', ()=>{
     v.aluguel||0, v.condominio||0, v.iptu||0, v.pacote||0,
     v.imobiliaria, v.corretor, v.telefone, v.link
   ].map(esc).join(','));
-  const csv = '\uFEFF' + cols.map(esc).join(',') + '\r\n' + linhas.join('\r\n');
+  const csv = cols.join(',') + '\r\n' + linhas.join('\r\n');
   const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
